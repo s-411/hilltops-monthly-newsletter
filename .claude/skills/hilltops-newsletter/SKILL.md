@@ -21,9 +21,23 @@ WordPress into a Divi layout-import JSON. The whole job is one script run.
    `.../2026/08/August-2026-Hilltops-VIC-Newsletter.pdf`. Guess it from that
    pattern and let the script's HEAD check confirm it.
 
-The images must already be uploaded to WordPress before running. They land as
-`1.jpg` … `12.jpg` (WordPress converts the source PNGs). Count and extension
-are both overridable.
+The images must already be uploaded to WordPress before running. They usually
+land as `1.jpg` … `12.jpg`, but **do not assume that** — WordPress does not
+always convert every PNG. In September 2026, images 1-10 became `.jpg` while
+11 and 12 stayed `.png`.
+
+So when the run reports 404s, check what actually exists before blaming the
+upload:
+
+```bash
+for n in $(seq 1 12); do for v in "$n.jpg" "$n.png"; do
+  printf "%s %s\n" "$v" "$(curl -s -o /dev/null -w '%{http_code}' -I \
+    "https://visithilltopsregion.com.au/wp-content/uploads/2026/09/$v")"
+done; done
+```
+
+then pass the real filenames with `--names`. Uploads also land gradually, so a
+404 can simply mean WordPress has not finished processing that file yet.
 
 ## Run it
 

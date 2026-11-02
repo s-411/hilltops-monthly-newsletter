@@ -13,6 +13,10 @@ always asks for **4 jobs**. Do all 4; the post alone is not the job.
    category Monthly Newsletters (233), featured image = the Thumbnail. Layout:
    Download button (the PDF) + one Divi image module per page, each linked to
    its click target in the email. Copy last month's post (content and Divi meta).
+   **Post date = the 1st of that month** (Steve's rule, even if the upload is
+   late): `"date": "<yyyy>-<mm>-01 09:00:00"` in `post.json` (if that time has
+   not come yet, the post would be Scheduled, so use an earlier time). Every newsletter
+   post was set to the 1st on 2026-11-02.
 2. **Home slide.** Home (235896): the **second** `[et_pb_slider]`, slide
    `admin_title="Newsletter slide"`. Set `heading`, the `<p>` text (both from the
    ticket, word for word), `button_link` to the new post, `background_image` to
@@ -55,8 +59,8 @@ The site has SFTP but no shell. Use the one-time script in
 `public_html/`, and stage files in `/home/vic/tmp-nl-job`. Actions
 (`?t=<token>&a=`): `dump`, `get&id=`, `import&f=&title=`, `create_post`
 (`post.json`), `update_page&id=&md5=` (`page-<id>.txt`; refuses if the page
-changed since the dump), `draft&id=` (newsletter posts only), `purge`,
-`cleanup`. After cleanup, check the script URL gives 404.
+changed since the dump), `draft&id=` (newsletter posts only), `set_dates`
+(`dates.json`, fixes post dates; refuses future dates), `purge`, `cleanup`. After cleanup, check the script URL gives 404.
 
 - Convert pages to JPG first (`sips -s format jpeg -s formatOptions 82`).
   Media titles `1`…`N`; the site makes `N-scaled.jpg` (1357x1920). Use the URL

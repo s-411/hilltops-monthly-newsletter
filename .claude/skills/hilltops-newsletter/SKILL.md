@@ -1,45 +1,80 @@
 ---
 name: hilltops-newsletter
-description: Build the monthly Hilltops VIC newsletter Divi import JSON. Use whenever the user wants to create this month's newsletter, generate the Divi/WordPress JSON, or pull the image hyperlinks out of the Mailchimp newsletter. Triggers on "do the newsletter", "August newsletter", "make the JSON", "new month".
+description: Upload the monthly Hilltops VIC "What's On" newsletter to visithilltopsregion.com.au — new post, home slide, What's On button, last year's post to Draft. Use whenever the user wants to do this month's newsletter, sends a Teamwork ticket "What's On In The Hilltops Region (<Month>)", or wants the Divi JSON or the image hyperlinks from the Mailchimp newsletter. Triggers on "do the newsletter", "November newsletter", "make the JSON", "new month".
 ---
 
 # Hilltops monthly newsletter
 
-Turns the month's Mailchimp campaign plus the images already uploaded to
-WordPress into a Divi layout-import JSON. The whole job is one script run.
+Every month Jada (Young Visitors Centre, vic@hilltops.nsw.gov.au) sends a
+Teamwork ticket "Fw: What's On In The Hilltops Region (<Month YYYY>)". The ticket
+always asks for **4 jobs**. Do all 4; the post alone is not the job.
 
-## What you need from the user
+1. **New post** "Newsletter <Month> <YYYY>", slug `newsletter-<month>-<yyyy>`,
+   category Monthly Newsletters (233), featured image = the Thumbnail. Layout:
+   Download button (the PDF) + one Divi image module per page, each linked to
+   its click target in the email. Copy last month's post (content and Divi meta).
+2. **Home slide.** Home (235896): the **second** `[et_pb_slider]`, slide
+   `admin_title="Newsletter slide"`. Set `heading`, the `<p>` text (both from the
+   ticket, word for word), `button_link` to the new post, `background_image` to
+   the Hero.
+3. **What's On "NEWSLETTER" button.** It is not on page 148 (that page is empty).
+   It is in the Theme Builder layout **117707** "Specific Pages: What's On"
+   (`et_body_layout`): `button_url="/newsletter-<month>-<yyyy>/"`.
+4. **Last year's same-month post → Draft** (e.g. November 2026 job → Newsletter
+   November 2025). Check that every older newsletter is Draft too: September and
+   October 2025 were missed and fixed on 2026-11-02.
 
-1. **Mailchimp "view in browser" URL** for this month's campaign
-   (e.g. `https://mailchi.mp/hilltops/whats-on-2026-18248637?e=e50981d050`).
-   This is where the per-image hyperlinks come from — never ask the user to
-   copy them out by hand.
-2. **Upload month** as `YYYY-MM` — the WordPress uploads folder
-   (`/wp-content/uploads/2026/08/`).
-3. **PDF URL** for the newsletter download button. WordPress sanitises the
-   upload filename, so `August 2026 - Hilltops VIC Newsletter.pdf` becomes
-   `.../2026/08/August-2026-Hilltops-VIC-Newsletter.pdf`. Guess it from that
-   pattern and let the script's HEAD check confirm it.
+Then Purge All, check, and reply on the ticket with the post link.
 
-The images must already be uploaded to WordPress before running. They usually
-land as `1.jpg` … `12.jpg`, but **do not assume that** — WordPress does not
-always convert every PNG. In September 2026, images 1-10 became `.jpg` while
-11 and 12 stayed `.png`.
+## Where the inputs are
 
-So when the run reports 404s, check what actually exists before blaming the
-upload:
+- **Ticket:** `https://webrenovator.teamwork.com/desk/tickets/<id>/messages`.
+  Claude can read it in Chrome (Steve is logged in). Get the Mailchimp link with
+  JS (walk the DOM, including shadow roots, for the "View this email in your
+  browser" `<a>`): `https://mailchi.mp/hilltops/whats-on-2026-<n>?e=…`.
+  The other links in the ticket are Mailchimp tracking links, which the Chrome
+  tool hides. The mailchi.mp page has the real ones.
+- **Files:** the same Dropbox folder every month (".2026 What's On Newsletters",
+  link in the ticket): `<Month> <YYYY> - Hilltops VIC Newsletter.zip` (pages
+  `1.png`…`N.png`), the `.pdf`, `<YYYY> <Month> Newsletter (Hero).jpg` (1920x1280,
+  home slide) and `(Thumbnail).jpg` (600x400, featured image). Ask Steve before
+  downloading. Never download "Past Newsletters". The folder page is JS-rendered:
+  get each file's `/scl/fo/<folder>/<fileid>/<name>` path from the page in Chrome,
+  then `curl -L "…?rlkey=<rlkey>&dl=1"`.
+- **Links per page:** `scripts/build_newsletter.py` pairs email image N with
+  page N. Run it with `--skip-verify` just to print the table. Then check every
+  pair against `pdftotext -f N -l N <pdf> -` (business names, web addresses on
+  the page) and curl every link. The last pages (What's On tables) have no link.
 
-```bash
-for n in $(seq 1 12); do for v in "$n.jpg" "$n.png"; do
-  printf "%s %s\n" "$v" "$(curl -s -o /dev/null -w '%{http_code}' -I \
-    "https://visithilltopsregion.com.au/wp-content/uploads/2026/09/$v")"
-done; done
-```
+## Doing it without wp-admin (how it was done 2026-11-02)
 
-then pass the real filenames with `--names`. Uploads also land gradually, so a
-404 can simply mean WordPress has not finished processing that file yet.
+The site has SFTP but no shell. Use the one-time script in
+`~/Documents/GitHub/visithilltopsregion-ssh/scripts/newsletter-job.tpl.php`
+(read that repo's CLAUDE.md first; OpenVPN must be on). Put a random token in
+`__TOKEN__`, last month's post ID in `__PREV_ID__`, save under a random name in
+`public_html/`, and stage files in `/home/vic/tmp-nl-job`. Actions
+(`?t=<token>&a=`): `dump`, `get&id=`, `import&f=&title=`, `create_post`
+(`post.json`), `update_page&id=&md5=` (`page-<id>.txt`; refuses if the page
+changed since the dump), `draft&id=` (newsletter posts only), `purge`,
+`cleanup`. After cleanup, check the script URL gives 404.
 
-## Run it
+- Convert pages to JPG first (`sips -s format jpeg -s formatOptions 82`).
+  Media titles `1`…`N`; the site makes `N-scaled.jpg` (1357x1920). Use the URL
+  `import` returns.
+- Rename Hero/Thumbnail to `Home-Slide-<YYYY>-<Month>-Newsletter.jpg` and
+  `Blog-Thumbnail-<YYYY>-<Month>-Newsletter.jpg`; the PDF to
+  `<Month>-<YYYY>-Hilltops-VIC-Newsletter.pdf`.
+- Back up home, layout 117707 and last month's post to
+  `visithilltopsregion-ssh/backups/<stamp>-newsletter-<yyyy-mm>/` before writing.
+- Check after: new post 200, all linked images in order, every image URL 200
+  (first requests make the Smush WebP copies, so this is slow), PDF 200; home
+  shows the new heading and links to the new post; What's On button links to
+  the new post; drafted posts give 404.
+
+## Other route: Divi JSON import in wp-admin
+
+If Steve prefers to upload in wp-admin himself, the script can build a Divi
+layout-import JSON instead:
 
 ```bash
 python3 scripts/build_newsletter.py \
@@ -49,49 +84,12 @@ python3 scripts/build_newsletter.py \
   --out "Newsletter August 2026.json"
 ```
 
-The script:
-
-- fetches the Mailchimp page and pulls every content `<img>` **in document
-  order** along with the `<a href>` wrapping it (unwrapped images get no link);
-- pairs image *N* in the email with `N.jpg` in the uploads folder — **position
-  is the only thing tying links to images**;
-- HEAD-checks every image URL and the PDF URL, warning on anything that isn't
-  200;
-- writes the Divi JSON and prints the image→link table.
-
-Always show the user that printed table. It is the one thing worth eyeballing.
-
-Useful flags: `--count` / `--ext` / `--names` when the images aren't a plain
-`1..N.jpg` run, `--skip-verify` to skip the HTTP checks.
-
-Produce exactly one file per month, in this format. Do not build variants.
-
-## Importing
-
-Divi Builder → Portability (the ⇅ icon) → Import → upload the JSON.
-
-The output is ~7 KB and just references the live image URLs. Its `images` key
-is deliberately empty: that key exists so a cross-site import can re-upload
-base64 copies of the artwork, but these images are already in this site's own
-media library, so there is nothing to carry.
-
-**This was confirmed against the live site in August 2026.** The small
-URL-only file imported correctly; a fat variant with base64-embedded images
-failed to import at all. Do not reintroduce embedded images — the old 5 MB
-exports in this repo are historical, not a target to match.
-
-The script also writes the JSON the way PHP's `json_encode` does — no spaces
-between tokens, every `/` escaped as `\/` — which is how Divi writes its own
-exports. That is the encoding that imported cleanly, so leave it alone.
-
-## Layout notes
-
-Every month is the same single section: one Download button, then N full-width
-image modules stacked with `2em` top padding. The boilerplate lives in
-`scripts/build_newsletter.py` (`SECTION_OPEN`, `BUTTON`, `IMAGE`,
-`GLOBAL_COLORS`) copied verbatim from a known-good export. If the client
-changes the design, update those constants rather than hand-editing output.
-
-The trailing images (contact details, the What's On table) usually have no
-hyperlink — that's expected, not a bug, and it comes straight from how the
-email was built.
+- Images must be uploaded first. WordPress does not convert every PNG the same
+  way (September 2026: 1-10 became `.jpg`, 11-12 stayed `.png`). On 404s, check
+  which name exists and pass `--names`. A 404 can also mean the upload is still
+  being processed.
+- Import: Divi Builder → Portability (⇅) → Import. Keep the small URL-only file
+  with an empty `images` key and the PHP-style encoding (no spaces, `\/`); a
+  base64 variant failed to import (August 2026).
+- Flags: `--count` / `--ext` / `--names`, `--skip-verify`.
+- Always show Steve the printed image → link table.
